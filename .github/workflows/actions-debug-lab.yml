@@ -56,9 +56,9 @@ jobs:
           cat <<EOF >> "$GITHUB_STEP_SUMMARY" # Append Markdown to this job's rendered run summary.
           # Actions Debug Lab
 
-          - Step debugging: enabled with the `ACTIONS_STEP_DEBUG=true` repository secret.
-          - Runner diagnostics: enabled with the `ACTIONS_RUNNER_DEBUG=true` repository secret.
-          - Job: `$GITHUB_JOB` on `$RUNNER_OS/$RUNNER_ARCH`.
+          - Step debugging: enabled with the \`ACTIONS_STEP_DEBUG=true\` repository secret.
+          - Runner diagnostics: enabled with the \`ACTIONS_RUNNER_DEBUG=true\` repository secret.
+          - Job: \`$GITHUB_JOB\` on \`$RUNNER_OS/$RUNNER_ARCH\`.
 
-          Open each step's log to find `::debug::` output and Bash `set -x` traces.
+          Open each step's log to find \`::debug::\` output and Bash \`set -x\` traces.
           EOF
