@@ -1,0 +1,64 @@
+# Display this label in the repository's Actions tab.
+name: Actions Debug Lab
+
+# Define the GitHub event that starts this teaching workflow.
+on:
+  # Run this workflow only when a user selects Run workflow in the Actions tab.
+  workflow_dispatch:
+
+# Grant the workflow only read access to repository contents.
+permissions:
+  contents: read
+
+# Group the independent work performed by this workflow.
+jobs:
+  # Give this diagnostic job an internal identifier.
+  diagnose:
+    # Use a fresh GitHub-hosted Linux virtual machine for this job.
+    runs-on: ubuntu-latest
+    # Execute the following steps in order on that virtual machine.
+    steps:
+      # Download the repository so its files are available to the diagnostic steps.
+      - name: Check out the repository
+        uses: actions/checkout@v4 # Use the maintained checkout action, major version 4.
+
+      # Emit messages that are useful when reading a workflow run.
+      - name: Emit debug and notice messages
+        run: |
+          echo "::debug::This is a step-debug message; it is visible because ACTIONS_STEP_DEBUG is true." # Write a debug-level message to this step's log.
+          echo "::notice title=Diagnostic lab::The workflow is running with GitHub Actions diagnostics enabled." # Write a highlighted notice to the log.
+          echo "Debug and runner diagnostics are configured at the repository level." # Print a normal log message for comparison.
+
+      # Show safe facts about the runner without printing tokens or other sensitive values.
+      - name: Inspect the runner environment safely
+        run: |
+          echo "Runner OS: $RUNNER_OS" # Show the operating system selected by runs-on.
+          echo "Runner architecture: $RUNNER_ARCH" # Show the processor architecture.
+          echo "Workspace: $GITHUB_WORKSPACE" # Show where the repository was checked out.
+          echo "Workflow: $GITHUB_WORKFLOW" # Show the workflow name that is running.
+          echo "Run number: $GITHUB_RUN_NUMBER" # Show the repository-scoped sequence number for this run.
+          echo "Event: $GITHUB_EVENT_NAME" # Show the event that started this workflow.
+          find . -maxdepth 2 -type f | sort # List nearby repository files in a stable order.
+
+      # Turn on Bash command tracing for this step only, then turn it off again.
+      - name: Demonstrate command tracing
+        shell: bash # Use Bash so set -x has its standard meaning.
+        run: |
+          set -x # Echo each following command to the log immediately before Bash executes it.
+          diagnostic_label="debug-run-${GITHUB_RUN_NUMBER}" # Create a value that identifies this run.
+          echo "Tracing is active for ${diagnostic_label}." # Run a harmless command that appears in the trace.
+          set +x # Stop command tracing before the step ends.
+          echo "Tracing is now off." # Show the normal log style after tracing is disabled.
+
+      # Add a concise report to the run's Summary page.
+      - name: Write the diagnostic summary
+        run: |
+          cat <<EOF >> "$GITHUB_STEP_SUMMARY" # Append Markdown to this job's rendered run summary.
+          # Actions Debug Lab
+
+          - Step debugging: enabled with the `ACTIONS_STEP_DEBUG=true` repository secret.
+          - Runner diagnostics: enabled with the `ACTIONS_RUNNER_DEBUG=true` repository secret.
+          - Job: `$GITHUB_JOB` on `$RUNNER_OS/$RUNNER_ARCH`.
+
+          Open each step's log to find `::debug::` output and Bash `set -x` traces.
+          EOF
