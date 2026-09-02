@@ -1,0 +1,71 @@
+# Display this label in the repository's Actions tab.
+name: Go CI
+
+# Define the GitHub events that start this workflow.
+on:
+  # Run this workflow when commits are pushed to the main branch.
+  push:
+    branches: [main] # Limit automatic push runs to the main branch.
+  # Run this workflow when a pull request targets the main branch.
+  pull_request:
+    branches: [main] # Limit pull-request validation to changes proposed for main.
+  # Allow manual runs from the Actions tab.
+  workflow_dispatch:
+
+# Grant the workflow only read access to repository contents.
+permissions:
+  contents: read
+
+# Group the independent work performed by this workflow.
+jobs:
+  # Give the Go validation job an internal identifier.
+  test:
+    # Run every selected Go version even if one version fails.
+    strategy:
+      fail-fast: false # Keep collecting results from the remaining Go versions.
+      matrix:
+        go-version: ['1.22.x', '1.23.x'] # Test the Go release lines your project supports.
+    # Use a fresh GitHub-hosted Linux virtual machine for each matrix job.
+    runs-on: ubuntu-latest
+    # Run all shell commands from the Go example project's directory.
+    defaults:
+      run:
+        working-directory: examples/go # Change this path to your Go module's directory.
+    # Execute the following steps in order on that virtual machine.
+    steps:
+      # Download the exact repository revision that triggered this workflow.
+      - name: Check out the repository
+        uses: actions/checkout@v4 # Use the maintained checkout action, major version 4.
+
+      # Install the Go version selected by this matrix job.
+      - name: Set up Go ${{ matrix.go-version }}
+        uses: actions/setup-go@v5 # Use the maintained Go setup action, major version 5.
+        with:
+          go-version: ${{ matrix.go-version }} # Read this job's Go version from the matrix.
+          cache-dependency-path: examples/go/go.sum # Use this module's checksum file as the cache key.
+
+      # Print the compiler version and project files to make the environment visible.
+      - name: Confirm Go and inspect project files
+        run: |
+          go version # Confirm which Go version is installed.
+          find . -maxdepth 3 -type f | sort # List project files in a stable order.
+
+      # Download the exact module dependencies declared by the Go module.
+      - name: Download dependencies
+        run: go mod download # Pre-fetch dependencies before analysis and testing.
+
+      # Fail when gofmt would modify any Go source file.
+      - name: Check formatting
+        run: test -z "$(gofmt -s -d .)" # Keep formatting deterministic without rewriting repository files.
+
+      # Run Go's standard static analyzer across every package.
+      - name: Run vet
+        run: go vet ./... # Detect common correctness problems.
+
+      # Run every test with Go's data-race detector enabled.
+      - name: Run tests with race detection
+        run: go test -race ./... # Detect unsafe concurrent memory access during tests.
+
+      # Ensure every package builds successfully after checks pass.
+      - name: Build packages
+        run: go build ./... # Compile all packages without producing an installation step.

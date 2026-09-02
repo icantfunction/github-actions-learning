@@ -1,0 +1,68 @@
+# Display this label in the repository's Actions tab.
+name: Rust CI
+
+# Define the GitHub events that start this workflow.
+on:
+  # Run this workflow when commits are pushed to the main branch.
+  push:
+    branches: [main] # Limit automatic push runs to the main branch.
+  # Run this workflow when a pull request targets the main branch.
+  pull_request:
+    branches: [main] # Limit pull-request validation to changes proposed for main.
+  # Allow manual runs from the Actions tab.
+  workflow_dispatch:
+
+# Grant the workflow only read access to repository contents.
+permissions:
+  contents: read
+
+# Group the independent work performed by this workflow.
+jobs:
+  # Give the Rust validation job an internal identifier.
+  test:
+    # Use a fresh GitHub-hosted Linux virtual machine for this job.
+    runs-on: ubuntu-latest
+    # Run all shell commands from the Rust example project's directory.
+    defaults:
+      run:
+        working-directory: examples/rust # Change this path to your Cargo project's directory.
+    # Execute the following steps in order on that virtual machine.
+    steps:
+      # Download the exact repository revision that triggered this workflow.
+      - name: Check out the repository
+        uses: actions/checkout@v4 # Use the maintained checkout action, major version 4.
+
+      # Install the stable Rust toolchain with the components needed by this workflow.
+      - name: Set up stable Rust
+        uses: dtolnay/rust-toolchain@stable # Install Rust, Cargo, Clippy, and rustfmt from the stable channel.
+        with:
+          components: clippy,rustfmt # Ensure the lint and formatter components are available.
+
+      # Restore Cargo's dependency cache to shorten repeated workflow runs.
+      - name: Cache Cargo dependencies
+        uses: Swatinem/rust-cache@v2 # Cache Cargo registry files and compiled dependencies.
+        with:
+          workspaces: examples/rust # Scope the cache to this Cargo workspace.
+
+      # Print the toolchain versions and project files to make the environment visible.
+      - name: Confirm Rust and inspect project files
+        run: |
+          rustc --version # Confirm the Rust compiler version.
+          cargo --version # Confirm the Cargo version.
+          find . -maxdepth 3 -type f | sort # List project files in a stable order.
+
+      # Fail when rustfmt would change the project's source files.
+      - name: Check formatting
+        run: cargo fmt --all -- --check # Verify standard Rust formatting without changing files.
+
+      # Treat all Clippy warnings as errors so static-analysis issues cannot be ignored.
+      - name: Run Clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings # Lint library, binary, and test targets.
+
+      # Run the full Rust test suite with every feature enabled.
+      - name: Run tests
+        run: cargo test --all-features # Verify behavior before producing a release build.
+
+      # Compile an optimized production build.
+      - name: Build release binary
+        run: cargo build --release # Ensure deployable optimized code compiles successfully.

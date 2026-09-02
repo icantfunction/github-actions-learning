@@ -1,0 +1,75 @@
+# Display this label in the repository's Actions tab.
+name: Python CI
+
+# Define the GitHub events that start this workflow.
+on:
+  # Run this workflow when commits are pushed to the main branch.
+  push:
+    branches: [main] # Limit automatic push runs to the main branch.
+  # Run this workflow when a pull request targets the main branch.
+  pull_request:
+    branches: [main] # Limit pull-request validation to changes proposed for main.
+  # Allow manual runs from the Actions tab.
+  workflow_dispatch:
+
+# Grant the workflow only read access to repository contents.
+permissions:
+  contents: read
+
+# Group the independent work performed by this workflow.
+jobs:
+  # Give the Python validation job an internal identifier.
+  test:
+    # Run every selected Python version even if one version fails.
+    strategy:
+      fail-fast: false # Keep collecting results from the remaining Python versions.
+      matrix:
+        python-version: ['3.10', '3.11', '3.12'] # Test the Python versions your project supports.
+    # Use a fresh GitHub-hosted Linux virtual machine for each matrix job.
+    runs-on: ubuntu-latest
+    # Run all shell commands from the Python example project's directory.
+    defaults:
+      run:
+        working-directory: examples/python # Change this path to your Python project's directory.
+    # Execute the following steps in order on that virtual machine.
+    steps:
+      # Download the exact repository revision that triggered this workflow.
+      - name: Check out the repository
+        uses: actions/checkout@v4 # Use the maintained checkout action, major version 4.
+
+      # Install the Python version selected by this matrix job.
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5 # Use the maintained Python setup action, major version 5.
+        with:
+          python-version: ${{ matrix.python-version }} # Read this job's version from the matrix.
+          cache: pip # Cache downloaded pip packages when dependency files change.
+
+      # Print the interpreter version and project files to make the environment visible.
+      - name: Confirm Python and inspect project files
+        run: |
+          python --version # Confirm which Python version is installed.
+          python -m pip --version # Confirm the pip version paired with this interpreter.
+          find . -maxdepth 3 -type f | sort # List project files in a stable order.
+
+      # Install the project's declared development and test dependencies.
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip # Update pip before resolving dependencies.
+          python -m pip install -r requirements.txt # Install the locked or declared project dependencies.
+
+      # Run static analysis with Ruff; replace this command if your project uses another linter.
+      - name: Run linter
+        run: python -m ruff check . # Fail on style or static-analysis violations.
+
+      # Run pytest and generate terminal plus XML coverage reports.
+      - name: Run tests with coverage
+        run: python -m pytest --cov=src --cov-report=term-missing --cov-report=xml # Adjust src for your package layout.
+
+      # Preserve the XML coverage report as a downloadable artifact.
+      - name: Upload coverage report
+        if: always() # Attempt the upload even when the tests fail.
+        uses: actions/upload-artifact@v4 # Use GitHub's maintained artifact-upload action, major version 4.
+        with:
+          name: python-coverage-${{ matrix.python-version }} # Give each Python-version report a distinct name.
+          path: examples/python/coverage.xml # Match the report path produced by pytest-cov.
+          if-no-files-found: warn # Show a useful warning when tests did not produce coverage.

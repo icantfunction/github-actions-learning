@@ -1,0 +1,50 @@
+# Display this label in the repository's Actions tab.
+name: Workflow Features Lab
+
+# Define the GitHub events that start this workflow.
+on:
+  # Run this teaching workflow only when a user selects Run workflow in the Actions tab.
+  workflow_dispatch:
+
+# Grant the workflow only read access to repository contents.
+permissions:
+  contents: read
+
+# Group the independent work performed by this workflow.
+jobs:
+  # Give this self-contained learning job an internal identifier.
+  demonstrate-files:
+    # Use a fresh GitHub-hosted Linux virtual machine for this job.
+    runs-on: ubuntu-latest
+    # Execute the following steps in order on that virtual machine.
+    steps:
+      # Download the repository so the job behaves like a typical CI workflow.
+      - name: Check out the repository
+        uses: actions/checkout@v4 # Use the maintained checkout action, major version 4.
+
+      # Create an environment variable, a step output, and the first part of the run summary.
+      - name: Prepare values for later steps
+        id: prepare # Give this step an identifier so later steps can read its outputs.
+        shell: bash # Use Bash syntax consistently on the Linux runner.
+        run: |
+          RUN_LABEL="learning-run-${GITHUB_RUN_NUMBER}" # Build a value using GitHub's unique run number.
+          echo "RUN_LABEL=$RUN_LABEL" >> "$GITHUB_ENV" # Append an environment variable for subsequent steps.
+          echo "artifact_name=report-$RUN_LABEL" >> "$GITHUB_OUTPUT" # Append a named output owned by this step.
+          cat <<'EOF' >> "$GITHUB_STEP_SUMMARY" # Append Markdown content to this run's Summary page.
+          # Workflow Features Lab
+
+          This run demonstrates `$GITHUB_ENV`, `$GITHUB_OUTPUT`, and `$GITHUB_STEP_SUMMARY`.
+          EOF
+
+      # Read the environment variable and step output created by the preceding step.
+      - name: Consume values from the environment and output
+        env: # Define a step-local variable using a GitHub Actions expression.
+          REPORT_NAME: ${{ steps.prepare.outputs.artifact_name }} # Read the named output from the prepare step.
+        run: |
+          echo "Environment value: $RUN_LABEL" # Read the value written to GITHUB_ENV by the earlier step.
+          echo "Step-output value: $REPORT_NAME" # Read the output mapped into this step's environment.
+          printf '| Value type | Value |\n| --- | --- |\n| Environment | `%s` |\n| Step output | `%s` |\n' "$RUN_LABEL" "$REPORT_NAME" >> "$GITHUB_STEP_SUMMARY" # Add a Markdown table to the run summary.
+
+      # Prove that this final step runs only after the values have been passed forward.
+      - name: Finish the lab
+        run: echo "The workflow features lab completed." # Emit a concise final log message.

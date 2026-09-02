@@ -1,0 +1,66 @@
+# Display this label in the repository's Actions tab.
+name: Java Maven CI
+
+# Define the GitHub events that start this workflow.
+on:
+  # Run this workflow when commits are pushed to the main branch.
+  push:
+    branches: [main] # Limit automatic push runs to the main branch.
+  # Run this workflow when a pull request targets the main branch.
+  pull_request:
+    branches: [main] # Limit pull-request validation to changes proposed for main.
+  # Allow manual runs from the Actions tab.
+  workflow_dispatch:
+
+# Grant the workflow only read access to repository contents.
+permissions:
+  contents: read
+
+# Group the independent work performed by this workflow.
+jobs:
+  # Give the Java validation job an internal identifier.
+  build:
+    # Run every selected JDK version even if one version fails.
+    strategy:
+      fail-fast: false # Keep collecting results from the remaining JDK versions.
+      matrix:
+        java-version: ['17', '21'] # Test the long-term-support JDK releases your project supports.
+    # Use a fresh GitHub-hosted Linux virtual machine for each matrix job.
+    runs-on: ubuntu-latest
+    # Run all shell commands from the Maven example project's directory.
+    defaults:
+      run:
+        working-directory: examples/java-maven # Change this path to your Maven project's directory.
+    # Execute the following steps in order on that virtual machine.
+    steps:
+      # Download the exact repository revision that triggered this workflow.
+      - name: Check out the repository
+        uses: actions/checkout@v4 # Use the maintained checkout action, major version 4.
+
+      # Install the JDK version selected by this matrix job and cache Maven dependencies.
+      - name: Set up JDK ${{ matrix.java-version }}
+        uses: actions/setup-java@v4 # Use the maintained Java setup action, major version 4.
+        with:
+          distribution: temurin # Use the Eclipse Temurin OpenJDK distribution.
+          java-version: ${{ matrix.java-version }} # Read this job's JDK version from the matrix.
+          cache: maven # Cache Maven's local repository between equivalent runs.
+
+      # Print runtime versions and project files to make the environment visible.
+      - name: Confirm Java and inspect project files
+        run: |
+          java --version # Confirm which JDK version is installed.
+          mvn --version # Confirm Maven and the JDK Maven is using.
+          find . -maxdepth 4 -type f | sort # List project files in a stable order.
+
+      # Compile, test, package, and run Maven's configured verification checks.
+      - name: Verify with Maven
+        run: mvn --batch-mode --no-transfer-progress verify # Keep logs concise while running the full Maven lifecycle.
+
+      # Preserve test reports as a downloadable artifact when Maven creates them.
+      - name: Upload Maven test reports
+        if: always() # Attempt the upload even when Maven verification fails.
+        uses: actions/upload-artifact@v4 # Use GitHub's maintained artifact-upload action, major version 4.
+        with:
+          name: maven-test-reports-jdk-${{ matrix.java-version }} # Give each JDK's reports a distinct name.
+          path: examples/java-maven/target/surefire-reports/ # Match Maven Surefire's report directory.
+          if-no-files-found: warn # Show a useful warning when Maven did not reach its test phase.
